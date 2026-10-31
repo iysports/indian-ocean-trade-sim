@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>세계적 상품 교역 - 인도양 무역 시뮬레이션</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 최상단 헤더: 게임 타이틀 & 라운드 진행 바 -->
+  <header class="game-header">
+    <div class="header-main">
+      <div class="title-area">
+        <h1>🌊 세계적 상품 교역 <span class="sub-title">인도양 무역 시뮬레이션</span></h1>
+        <div class="round-badge" id="round-badge">1라운드: 지역 내 교역</div>
+      </div>
+      <div class="quick-status">
+        <div class="status-chip location-chip">
+          <span class="chip-label">현재 위치</span>
+          <span class="chip-val" id="header-location">🇮🇳 인도 (캘리컷)</span>
+        </div>
+        <div class="status-chip money-chip">
+          <span class="chip-label">보유 자금</span>
+          <span class="chip-val gold-text" id="header-money">500 냥</span>
+        </div>
+        <div class="status-chip days-chip">
+          <span class="chip-label">게임 날짜 (남은 기간)</span>
+          <span class="chip-val highlight-text" id="header-days">1일차 <small>(남은 기간: 4일)</small></span>
+        </div>
+        <div class="status-chip profit-chip">
+          <span class="chip-label">누적 순이익</span>
+          <span class="chip-val" id="header-profit">+0 냥</span>
+        </div>
+        <button id="btn-show-help" class="btn-help" title="게임 안내 및 도움말">ℹ️ 도움말</button>
+      </div>
+    </div>
+
+    <!-- 라운드 진행 프로그레스 바 -->
+    <div class="round-progress-container">
+      <div class="round-step step-1 active" id="step-r1">
+        <span class="step-num">1</span>
+        <span class="step-text">1R: 지역 내 교역</span>
+      </div>
+      <div class="step-line" id="line-r1-r2"></div>
+      <div class="round-step step-2" id="step-r2">
+        <span class="step-num">2</span>
+        <span class="step-text">2R: 직접 이동 교역</span>
+      </div>
+      <div class="step-line" id="line-r2-r3"></div>
+      <div class="round-step step-3" id="step-r3">
+        <span class="step-num">3</span>
+        <span class="step-text">3R: 중계무역</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 실시간 거래/비용 플로팅 알림 토스트 컨테이너 -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- 메인 게임 레이아웃: 지도 영역 & 제어 패널 영역 -->
+  <main class="game-container">
+    <!-- 왼쪽: 인터랙티브 인도양 무역 지도 -->
+    <section class="map-section" aria-label="인도양 무역 지도">
+      <div class="map-toolbar">
+        <div class="map-legend">
+          <span class="legend-item"><span class="legend-color sea-line"></span> ⛵ 해상 항로</span>
+          <span class="legend-item"><span class="legend-color land-line"></span> 🐪 육상 비단길 (중앙아시아 경유)</span>
+          <span class="legend-item"><span class="legend-icon">📍</span> 현재 위치</span>
+          <span class="legend-item"><span class="legend-icon">🟢</span> 이동 가능</span>
+        </div>
+        <div class="operating-cost-info">
+          <span>하루 고정 운영비: <strong class="red-text">-5 냥/일</strong></span>
+        </div>
+      </div>
+
+      <div class="map-wrapper" id="map-wrapper">
+        <svg id="trade-map-svg" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- 바다 배경 그라디언트 -->
+            <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#0f2b48" />
+              <stop offset="50%" stop-color="#143e64" />
+              <stop offset="100%" stop-color="#0d253e" />
+            </linearGradient>
+
+            <!-- 육지 그라디언트 -->
+            <linearGradient id="landGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#243328" />
+              <stop offset="100%" stop-color="#19231c" />
+            </linearGradient>
+
+            <!-- 빛나는 포트 필터 -->
+            <filter id="glow-gold" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="6" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id="glow-cyan" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <!-- 배경 해양 -->
+          <rect width="960" height="540" fill="url(#oceanGrad)" />
+
+          <!-- 역사적 장식: 위도 경도 격자선 & 나침반 방위표 -->
+          <g class="map-grid" opacity="0.15">
+            <line x1="80" y1="0" x2="80" y2="540" stroke="#8cb8ff" stroke-width="1" stroke-dasharray="4,6" />
+            <line x1="300" y1="0" x2="300" y2="540" stroke="#8cb8ff" stroke-width="1" stroke-dasharray="4,6" />
+            <line x1="540" y1="0" x2="540" y2="540" stroke="#8cb8ff" stroke-width="1" stroke-dasharray="4,6" />
+            <line x1="760" y1="0" x2="760" y2="540" stroke="#8cb8ff" stroke-width="1" stroke-dasharray="4,6" />
+            <line x1="0" y1="180" x2="960" y2="180" stroke="#8cb8ff" stroke-width="1" stroke-dasharray="4,6" />
+            <line x1="0" y1="360" x2="960" y2="360" stroke="#8cb8ff" stroke-width="1" stroke-dasharray="4,6" />
+          </g>
+
+          <!-- 나침반 장식 (Compass Rose) -->
+          <g transform="translate(100, 80) scale(0.65)" opacity="0.35">
+            <circle cx="0" cy="0" r="45" fill="none" stroke="#e2b774" stroke-width="2" />
+            <polygon points="0,-45 8,-12 0,0" fill="#e2b774" />
+            <polygon points="0,-45 -8,-12 0,0" fill="#b08643" />
+            <polygon points="0,45 8,12 0,0" fill="#b08643" />
+            <polygon points="0,45 -8,12 0,0" fill="#e2b774" />
+            <polygon points="45,0 12,8 0,0" fill="#e2b774" />
+            <polygon points="45,0 12,-8 0,0" fill="#b08643" />
+            <polygon points="-45,0 -12,8 0,0" fill="#b08643" />
+            <polygon points="-45,0 -12,-8 0,0" fill="#e2b774" />
+            <text x="0" y="-52" text-anchor="middle" fill="#e2b774" font-size="14" font-weight="bold">N</text>
+            <text x="0" y="65" text-anchor="middle" fill="#e2b774" font-size="12">S</text>
+            <text x="60" y="5" text-anchor="middle" fill="#e2b774" font-size="12">E</text>
+            <text x="-60" y="5" text-anchor="middle" fill="#e2b774" font-size="12">W</text>
+          </g>
+
+          <!-- 역사 지리적 대륙 윤곽 (인도양을 둘러싼 대륙들 개략도) -->
+          <!-- 동아프리카 해안선 -->
+          <path class="continent-land" d="M 20 200 Q 80 180 140 190 Q 200 210 210 270 Q 220 330 200 400 Q 180 480 130 540 L 0 540 L 0 200 Z" fill="url(#landGrad)" stroke="#3e5242" stroke-width="1.5" />
+          <!-- 마다가스카르 섬 -->
+          <ellipse cx="270" cy="500" rx="16" ry="32" transform="rotate(25 270 500)" fill="url(#landGrad)" stroke="#3e5242" />
+
+          <!-- 아라비아 반도 및 서아시아 -->
+          <path class="continent-land" d="M 220 120 Q 280 130 350 140 Q 420 180 390 260 Q 360 300 300 280 Q 250 250 220 190 Z" fill="url(#landGrad)" stroke="#3e5242" stroke-width="1.5" />
+
+          <!-- 중앙아시아 & 페르시아 내륙 (비단길 육상 지역) -->
+          <path class="continent-land" d="M 360 80 Q 500 50 680 70 Q 720 120 620 140 Q 480 150 360 80 Z" fill="url(#landGrad)" stroke="#3e5242" stroke-width="1.5" />
+
+          <!-- 인도 아대륙 -->
+          <path class="continent-land" d="M 460 160 Q 560 170 630 180 Q 640 240 590 320 Q 560 380 540 430 Q 510 380 480 300 Q 460 230 460 160 Z" fill="url(#landGrad)" stroke="#3e5242" stroke-width="1.5" />
+          <!-- 스리랑카 섬 -->
+          <ellipse cx="585" cy="425" rx="10" ry="15" fill="url(#landGrad)" stroke="#3e5242" />
+
+          <!-- 동남아시아 및 말레이 반도 / 도서부 -->
+          <path class="continent-land" d="M 680 200 Q 730 220 740 290 Q 750 360 730 410 Q 710 370 700 310 Q 690 240 680 200 Z" fill="url(#landGrad)" stroke="#3e5242" stroke-width="1.5" />
+          <!-- 수마트라/자바 섬 개략 -->
+          <path class="continent-land" d="M 720 430 Q 780 440 850 460 Q 820 480 730 460 Z" fill="url(#landGrad)" stroke="#3e5242" />
+          <path class="continent-land" d="M 780 330 Q 840 330 870 380 Q 820 400 780 370 Z" fill="url(#landGrad)" stroke="#3e5242" />
+
+          <!-- 중국 남부 해안 및 동아시아 -->
+          <path class="continent-land" d="M 720 70 Q 840 80 950 90 L 960 260 Q 880 250 820 220 Q 760 190 720 130 Z" fill="url(#landGrad)" stroke="#3e5242" stroke-width="1.5" />
+
+          <!-- 해양 라벨 및 계절풍(몬순) 안내 장식 -->
+          <text x="440" y="490" fill="#4d7c9e" font-size="20" font-weight="bold" letter-spacing="4" opacity="0.6">인 도 양 (INDIAN OCEAN)</text>
+          <text x="350" y="360" fill="#3b6989" font-size="13" font-style="italic" opacity="0.7">아라비아해 🌊</text>
+          <text x="640" y="380" fill="#3b6989" font-size="13" font-style="italic" opacity="0.7">벵골만 🌊</text>
+          <text x="770" y="420" fill="#3b6989" font-size="12" font-style="italic" opacity="0.7">말라카 해협 ⚓</text>
+
+          <!-- 계절풍(몬순) 화살표 장식 -->
+          <g class="monsoon-arrows" opacity="0.4">
+            <path d="M 330 420 Q 420 400 500 360" fill="none" stroke="#68a5d1" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow)" />
+            <text x="410" y="415" fill="#68a5d1" font-size="11">여름 남서 계절풍 ↗</text>
+            <path d="M 680 300 Q 590 280 500 250" fill="none" stroke="#68a5d1" stroke-width="2" stroke-dasharray="6,4" />
+            <text x="590" y="270" fill="#68a5d1" font-size="11">겨울 북동 계절풍 ↙</text>
+          </g>
+
+          <!-- ================= 교역 경로 라인 ================= -->
+          <g id="routes-layer">
+            <!-- 1. 해상 항로들 (곡선) -->
+            <!-- 중국 <-> 동남아시아 (해상) -->
+            <path id="route-china-southeast_asia" class="trade-route-path sea-route"
+                  d="M 840 170 C 810 240, 770 290, 740 350" />
+
+            <!-- 동남아시아 <-> 인도 (해상) -->
+            <path id="route-southeast_asia-india" class="trade-route-path sea-route"
+                  d="M 740 350 C 670 370, 600 340, 540 300" />
+
+            <!-- 인도 <-> 아라비아 (해상) -->
+            <path id="route-india-arabia" class="trade-route-path sea-route"
+                  d="M 540 300 C 470 330, 400 300, 320 250" />
+
+            <!-- 아라비아 <-> 동아프리카 (해상) -->
+            <path id="route-arabia-east_africa" class="trade-route-path sea-route"
+                  d="M 320 250 C 290 310, 260 370, 230 430" />
+
+            <!-- 2. 육상 비단길 (중국 <-> 아라비아, 중앙아시아 경유) -->
+            <path id="route-china-arabia-land" class="trade-route-path land-route"
+                  d="M 840 170 Q 710 110 580 110 T 320 250" />
+          </g>
+
+          <!-- 중앙아시아 경유지 마커 (거래 거점이 아닌 육상 경유지 안내) -->
+          <g id="waypoint-central-asia" transform="translate(580, 110)">
+            <circle cx="0" cy="0" r="7" fill="#8d6e63" stroke="#d7ccc8" stroke-width="1.5" stroke-dasharray="2,2" />
+            <text x="0" y="-12" text-anchor="middle" fill="#d7ccc8" font-size="11" font-weight="bold">🐪 중앙아시아 (비단길 경유지)</text>
+          </g>
+
+          <!-- 경로 위 뱃길/낙타 애니메이션 표시용 마커 -->
+          <g id="travel-anim-marker" style="display: none; pointer-events: none;">
+            <circle cx="0" cy="0" r="18" fill="#ffd166" opacity="0.3" class="pulse-ring" />
+            <circle cx="0" cy="0" r="12" fill="#ffd166" stroke="#222" stroke-width="2" />
+            <text id="travel-anim-icon" x="0" y="4" text-anchor="middle" font-size="14">⛵</text>
+          </g>
+
+          <!-- ================= 5대 주요 교역 거점 노드 ================= -->
+          <g id="hubs-layer">
+            <!-- 1. 중국 (광저우/천주) : x: 840, y: 170 -->
+            <g id="hub-china" class="hub-node" data-hub="china" transform="translate(840, 170)" tabindex="0" role="button" aria-label="중국 거점">
+              <circle class="hub-glow" cx="0" cy="0" r="28" />
+              <circle class="hub-base" cx="0" cy="0" r="16" />
+              <text class="hub-flag" x="0" y="5" text-anchor="middle">🇨🇳</text>
+              <!-- 라벨 카드 -->
+              <g class="hub-label-card" transform="translate(0, 32)">
+                <rect class="label-bg" x="-60" y="-12" width="120" height="34" rx="6" />
+                <text class="label-title" x="0" y="2" text-anchor="middle">중국 (광저우)</text>
+                <text class="label-goods" x="0" y="16" text-anchor="middle">비단 · 도자기</text>
+              </g>
+            </g>
+
+            <!-- 2. 동남아시아 (말라카) : x: 740, y: 350 -->
+            <g id="hub-southeast_asia" class="hub-node" data-hub="southeast_asia" transform="translate(740, 350)" tabindex="0" role="button" aria-label="동남아시아 거점">
+              <circle class="hub-glow" cx="0" cy="0" r="28" />
+              <circle class="hub-base" cx="0" cy="0" r="16" />
+              <text class="hub-flag" x="0" y="5" text-anchor="middle">🏝️</text>
+              <g class="hub-label-card" transform="translate(0, 32)">
+                <rect class="label-bg" x="-65" y="-12" width="130" height="34" rx="6" />
+                <text class="label-title" x="0" y="2" text-anchor="middle">동남아시아 (말라카)</text>
+                <text class="label-goods" x="0" y="16" text-anchor="middle">향신료 (정향·후추)</text>
+              </g>
+            </g>
+
+            <!-- 3. 인도 (캘리컷) : x: 540, y: 300 -->
+            <g id="hub-india" class="hub-node" data-hub="india" transform="translate(540, 300)" tabindex="0" role="button" aria-label="인도 거점">
+              <circle class="hub-glow" cx="0" cy="0" r="28" />
+              <circle class="hub-base" cx="0" cy="0" r="16" />
+              <text class="hub-flag" x="0" y="5" text-anchor="middle">🇮🇳</text>
+              <g class="hub-label-card" transform="translate(0, 32)">
+                <rect class="label-bg" x="-60" y="-12" width="120" height="34" rx="6" />
+                <text class="label-title" x="0" y="2" text-anchor="middle">인도 (캘리컷)</text>
+                <text class="label-goods" x="0" y="16" text-anchor="middle">면직물</text>
+              </g>
+            </g>
+
+            <!-- 4. 아라비아 (호르무즈/아덴) : x: 320, y: 250 -->
+            <g id="hub-arabia" class="hub-node" data-hub="arabia" transform="translate(320, 250)" tabindex="0" role="button" aria-label="아라비아 거점">
+              <circle class="hub-glow" cx="0" cy="0" r="28" />
+              <circle class="hub-base" cx="0" cy="0" r="16" />
+              <text class="hub-flag" x="0" y="5" text-anchor="middle">🕌</text>
+              <g class="hub-label-card" transform="translate(0, 32)">
+                <rect class="label-bg" x="-60" y="-12" width="120" height="34" rx="6" />
+                <text class="label-title" x="0" y="2" text-anchor="middle">아라비아 (호르무즈)</text>
+                <text class="label-goods" x="0" y="16" text-anchor="middle">향료(유향) · 직물</text>
+              </g>
+            </g>
+
+            <!-- 5. 동아프리카 (킬와/모가디슈) : x: 230, y: 430 -->
+            <g id="hub-east_africa" class="hub-node" data-hub="east_africa" transform="translate(230, 430)" tabindex="0" role="button" aria-label="동아프리카 거점">
+              <circle class="hub-glow" cx="0" cy="0" r="28" />
+              <circle class="hub-base" cx="0" cy="0" r="16" />
+              <text class="hub-flag" x="0" y="5" text-anchor="middle">🌍</text>
+              <g class="hub-label-card" transform="translate(0, 32)">
+                <rect class="label-bg" x="-60" y="-12" width="120" height="34" rx="6" />
+                <text class="label-title" x="0" y="2" text-anchor="middle">동아프리카 (킬와)</text>
+                <text class="label-goods" x="0" y="16" text-anchor="middle">금 · 상아</text>
+              </g>
+            </g>
+          </g>
+
+          <!-- 현재 위치 플레이어 핀 마커 -->
+          <g id="player-location-pin" transform="translate(540, 300)">
+            <circle cx="0" cy="0" r="24" class="player-ping-circle" />
+            <circle cx="0" cy="0" r="14" fill="#ff4d4d" stroke="#ffffff" stroke-width="2.5" />
+            <text x="0" y="4" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff">나</text>
+            <rect x="-35" y="-38" width="70" height="20" rx="4" fill="#ff4d4d" stroke="#fff" stroke-width="1" />
+            <text x="0" y="-24" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold">현재 위치</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- 지도 하단 힌트/상태 안내 바 -->
+      <div class="map-status-bar" id="map-status-bar">
+        <span class="guide-icon">💡</span>
+        <span id="map-guide-text">1라운드: 현재 위치(인도)에서 상품을 사고팔며 지역 내 교역을 체험해 보세요.</span>
+      </div>
+    </section>
+
+    <!-- 오른쪽: 교역 제어 및 정보 패널 -->
+    <section class="control-section" aria-label="무역 제어 패널">
+      <!-- 탭 내비게이션 -->
+      <div class="control-tabs" role="tablist">
+        <button class="tab-btn active" id="tab-trade-btn" data-tab="trade">📦 상품 거래 (시장)</button>
+        <button class="tab-btn" id="tab-move-btn" data-tab="move" disabled>🧭 지역 이동</button>
+        <button class="tab-btn" id="tab-middleman-btn" data-tab="middleman" disabled>🤝 중계무역상</button>
+        <button class="tab-btn" id="tab-log-btn" data-tab="log">📜 활동 기록</button>
+      </div>
+
+      <!-- 탭 1: 상품 거래 (구매 및 판매) -->
+      <div class="tab-pane active" id="pane-trade">
+        <!-- 현재 위치 시장 정보 헤더 -->
+        <div class="market-header">
+          <div class="market-location-info">
+            <h2 id="market-city-name">🇮🇳 인도 시장 (캘리컷)</h2>
+            <span class="market-desc">이 지역의 특산품을 구매하거나, 가져온 물품을 판매할 수 있습니다.</span>
+          </div>
+          <div class="time-cost-badge">거래당 소요 시간: <strong>1일</strong> (운영비 5냥)</div>
+        </div>
+
+        <!-- 상품 2분할 뷰: 시장 판매 품목(구매하기) & 내 인벤토리(판매하기) -->
+        <div class="trade-columns">
+          <!-- 좌측 컬럼: 시장에서 살 수 있는 상품 -->
+          <div class="trade-box buy-box">
+            <div class="trade-box-header">
+              <h3>🛒 시장 특산물 구매</h3>
+              <span class="box-desc">현지 특산물은 원가가 저렴합니다.</span>
+            </div>
+            <div class="goods-list" id="buy-goods-list">
+              <!-- JS 렌더링 -->
+            </div>
+          </div>
+
+          <!-- 우측 컬럼: 내가 보유한 물품 중 판매 가능한 상품 -->
+          <div class="trade-box sell-box">
+            <div class="trade-box-header">
+              <h3>💰 보유 상품 판매</h3>
+              <span class="box-desc">먼 곳에서 가져온 희귀 품목일수록 비쌉니다.</span>
+            </div>
+            <div class="goods-list" id="sell-goods-list">
+              <!-- JS 렌더링 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 현재 내 화물 창고 요약 -->
+        <div class="inventory-summary-bar">
+          <span class="inv-title">🎒 나의 화물 창고:</span>
+          <div class="inv-items-inline" id="inventory-items-inline">
+            <span class="empty-inv">보유 상품 없음</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭 2: 지역 이동 (2라운드부터 해금) -->
+      <div class="tab-pane" id="pane-move">
+        <div class="move-panel-header">
+          <h2>🧭 다른 교역 거점으로 이동하기</h2>
+          <p class="panel-desc">직접 배를 타거나 대상을 이끌고 이동합니다. 소요 시간과 운송비, 이동 중 생활비(일일 5냥)가 발생합니다.</p>
+        </div>
+
+        <div class="move-destinations-list" id="move-destinations-list">
+          <!-- JS 렌더링: 이동 가능한 경로 카드 목록 -->
+        </div>
+      </div>
+
+      <!-- 탭 3: 중계무역상 이용 (3라운드부터 해금) -->
+      <div class="tab-pane" id="pane-middleman">
+        <div class="middleman-header">
+          <div class="middleman-title-group">
+            <h2>🤝 중계무역상 사무소</h2>
+            <span class="badge-round3">3라운드 전용 혁신</span>
+          </div>
+          <p class="panel-desc">
+            직접 배를 타고 갈 필요 없이, 중간 상인 네트워크를 통해 <strong>단 1일</strong> 만에 먼 지역의 상품을 거래합니다.
+            <br>단, 위험과 이동을 대신해 주는 대가로 <strong>중계 수수료(35%)</strong>가 부과됩니다.
+          </p>
+        </div>
+
+        <!-- 비교 기능 배너 버튼 -->
+        <div class="compare-banner-card">
+          <div class="banner-text">
+            <strong>💡 교역 방식 전격 비교!</strong>
+            <span>직접 먼 지역까지 항해하는 것과 중계무역상을 쓰는 것 중 무엇이 이득일까요?</span>
+          </div>
+          <button id="btn-open-compare" class="btn-compare">📊 직접 이동 vs 중계무역 비교 분석기</button>
+        </div>
+
+        <!-- 중계무역 원격 발주 목록 -->
+        <div class="middleman-orders-section">
+          <h3>🌏 원격 상품 수입 주문 (소요 시간: 1일)</h3>
+          <div class="middleman-goods-grid" id="middleman-goods-grid">
+            <!-- JS 렌더링 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭 4: 무역 활동 기록 (가계부 / 장부) -->
+      <div class="tab-pane" id="pane-log">
+        <div class="log-panel-header">
+          <h2>📜 무역 상단 장부 (활동 기록)</h2>
+          <div class="log-summary-stats" id="log-summary-stats">
+            <!-- JS 렌더링: 누적 지출, 누적 수익 등 -->
+          </div>
+        </div>
+        <div class="log-list-container" id="activity-log-list">
+          <!-- 거래 및 이동 기록 내역 -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= 모달 팝업들 ================= -->
+
+  <!-- 1. 거래 실행(수량 선택) 모달 -->
+  <div class="modal-overlay" id="modal-trade" role="dialog" aria-modal="true" aria-labelledby="trade-modal-title">
+    <div class="modal-box trade-modal-box">
+      <div class="modal-header">
+        <h3 id="trade-modal-title">상품 거래</h3>
+        <button class="btn-close-modal" id="btn-close-trade-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="trade-target-item">
+          <div class="item-visual" id="trade-item-icon">🧵</div>
+          <div class="item-meta">
+            <h4 id="trade-item-name">면직물</h4>
+            <p id="trade-item-desc">가볍고 통기성이 뛰어나 인도양 전역에서 인기 있는 인도산 직물</p>
+            <div class="trade-unit-price">
+              <span id="trade-action-label">단가:</span>
+              <strong id="trade-unit-price-val">20 냥</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 수량 조절 인터페이스 -->
+        <div class="quantity-controller">
+          <label for="trade-quantity">거래 수량 선택:</label>
+          <div class="qty-btn-group">
+            <button type="button" class="btn-qty" id="btn-qty-minus">-</button>
+            <input type="number" id="trade-quantity" min="1" max="50" value="1" />
+            <button type="button" class="btn-qty" id="btn-qty-plus">+</button>
+          </div>
+          <div class="quick-qty-group">
+            <button type="button" class="btn-quick-qty" data-qty="1">1개</button>
+            <button type="button" class="btn-quick-qty" data-qty="3">3개</button>
+            <button type="button" class="btn-quick-qty" data-qty="5">5개</button>
+            <button type="button" class="btn-quick-qty" id="btn-qty-max">최대 가능</button>
+          </div>
+        </div>
+
+        <!-- 거래 내역 계산 요약표 -->
+        <div class="trade-calc-breakdown">
+          <div class="calc-row">
+            <span>상품 대금:</span>
+            <span id="calc-goods-total">20 냥</span>
+          </div>
+          <div class="calc-row" id="calc-middleman-fee-row" style="display: none;">
+            <span>중계무역 수수료 (35%):</span>
+            <span class="red-text" id="calc-middleman-fee">+7 냥</span>
+          </div>
+          <div class="calc-row">
+            <span>소요 시간:</span>
+            <span><strong>1일</strong> (하루 고정 운영비: <span class="red-text">-5 냥</span>)</span>
+          </div>
+          <hr />
+          <div class="calc-row total-row">
+            <span id="calc-final-label">예상 총 지출:</span>
+            <strong id="calc-final-total" class="red-text">-25 냥</strong>
+          </div>
+          <div class="calc-row preview-balance-row">
+            <span>거래 후 보유 자금:</span>
+            <span id="calc-after-balance">475 냥</span>
+          </div>
+          <div class="calc-row preview-days-row">
+            <span>거래 후 남은 기간:</span>
+            <span id="calc-after-days">3일</span>
+          </div>
+        </div>
+
+        <!-- 경고 메시지 영역 (자금 부족, 시간 부족 등) -->
+        <div class="trade-warning-msg" id="trade-warning-msg" style="display: none;">
+          ⚠️ 경고 문구
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="btn-cancel-trade">취소</button>
+        <button class="btn-confirm" id="btn-confirm-trade">거래 확정 (1일 소요)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 라운드 시작 안내 모달 -->
+  <div class="modal-overlay" id="modal-round-intro" role="dialog" aria-modal="true">
+    <div class="modal-box intro-modal-box">
+      <div class="round-intro-header">
+        <div class="round-intro-tag" id="intro-round-tag">1라운드 안내</div>
+        <h2 id="intro-round-title">우리 지역에서 교역하기!</h2>
+      </div>
+      <div class="round-intro-content">
+        <div class="intro-goal-box">
+          <span class="goal-label">🎯 이번 라운드 학습 목표</span>
+          <p id="intro-round-goal">지역마다 거래할 수 있는 상품에 차이가 있음을 경험하고 지역 간 교역의 필요성을 생각한다.</p>
+        </div>
+        <div class="intro-message-box">
+          <p id="intro-round-desc">
+            여러분은 무역상이 되어 교역을 시작합니다. 현재 머물고 있는 지역에서 상품을 구매하거나 판매할 수 있습니다.
+            다른 지역으로 이동할 수는 없습니다. 우리 지역에서 거래할 수 있는 상품을 살펴보고 교역을 시작해 보세요.
+          </p>
+        </div>
+        <div class="intro-rules-grid">
+          <div class="rule-card">
+            <span class="rule-icon">📅</span>
+            <div class="rule-info">
+              <strong>활동 기간</strong>
+              <span id="intro-round-days">총 4일</span>
+            </div>
+          </div>
+          <div class="rule-card">
+            <span class="rule-icon">🪙</span>
+            <div class="rule-info">
+              <strong>고정 운영비</strong>
+              <span>하루 5냥 자동 지출</span>
+            </div>
+          </div>
+          <div class="rule-card">
+            <span class="rule-icon">🔓</span>
+            <div class="rule-info">
+              <strong>해금 기능</strong>
+              <span id="intro-round-features">지역 내 상품 구매/판매</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer center-footer">
+        <button class="btn-confirm-large" id="btn-start-round">교역 시작하기! 🚀</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 라운드 종료 및 학습지 질문 모달 -->
+  <div class="modal-overlay" id="modal-round-debrief" role="dialog" aria-modal="true">
+    <div class="modal-box debrief-modal-box">
+      <div class="modal-header">
+        <h3 id="debrief-title">🎉 1라운드 활동 종료 & 학습지 정리</h3>
+      </div>
+      <div class="modal-body">
+        <div class="debrief-summary-banner" id="debrief-stats-banner">
+          <!-- 1라운드 동안의 성과 요약 -->
+        </div>
+
+        <div class="worksheet-question-box">
+          <div class="question-header">
+            <span class="pencil-icon">✏️</span>
+            <strong>역사 학습지 연계 생각 질문</strong>
+          </div>
+          <p class="question-text" id="debrief-question-text">
+            "내가 거래한 상품은 무엇이며, 지역마다 거래할 수 있는 상품에 차이가 있었는가?"
+          </p>
+          <div class="question-hint">
+            💡 <strong>생각해 보기:</strong> 현지에서 생산된 특산품은 왜 원가가 낮고, 다른 지역에서는 왜 더 높은 가치를 인정받을까요?
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-confirm-large" id="btn-next-round">다음 라운드로 넘어가기 ➡️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 교역 방식 비교 분석 모달 (Round 3 전용) -->
+  <div class="modal-overlay" id="modal-compare" role="dialog" aria-modal="true">
+    <div class="modal-box compare-modal-box">
+      <div class="modal-header">
+        <h3>⚖️ 직교역 vs 중계무역 비교 분석기</h3>
+        <button class="btn-close-modal" id="btn-close-compare-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="compare-selector-bar">
+          <label for="compare-item-select">비교할 먼 지역 특산물:</label>
+          <select id="compare-item-select">
+            <!-- JS 옵션 렌더링 -->
+          </select>
+        </div>
+
+        <div class="compare-cards-container">
+          <!-- 방식 A: 직접 이동 (왕복 해상/육상 항해) -->
+          <div class="compare-card direct-card">
+            <div class="card-badge badge-direct">방식 A. 직접 이동 교역 ⛵🐪</div>
+            <h4>내가 직접 왕복 항해하여 구입</h4>
+            <ul class="compare-details-list" id="compare-direct-details">
+              <!-- JS 동적 계산 -->
+            </ul>
+            <div class="compare-summary-box">
+              <div class="sum-row">소요 시간: <strong id="compare-direct-days">4일</strong></div>
+              <div class="sum-row">총 비용(경비+원가): <strong class="red-text" id="compare-direct-cost">125냥</strong></div>
+            </div>
+            <div class="method-pros-cons">
+              <span class="tag-pro">장점: 중계 수수료 없음 (원가 구매)</span>
+              <span class="tag-con">단점: 긴 이동 일수 소요, 높은 운송비와 생활비 지출</span>
+            </div>
+          </div>
+
+          <!-- 방식 B: 중계무역상 이용 -->
+          <div class="compare-card middleman-card">
+            <div class="card-badge badge-middleman">방식 B. 중계무역상 이용 🤝</div>
+            <h4>현재 지역에 머물며 원격 구매</h4>
+            <ul class="compare-details-list" id="compare-middleman-details">
+              <!-- JS 동적 계산 -->
+            </ul>
+            <div class="compare-summary-box">
+              <div class="sum-row">소요 시간: <strong class="highlight-text" id="compare-middleman-days">단 1일!</strong></div>
+              <div class="sum-row">총 비용(원가+수수료+운영비): <strong class="red-text" id="compare-middleman-cost">72.5냥</strong></div>
+            </div>
+            <div class="method-pros-cons">
+              <span class="tag-pro">장점: 1일 만에 즉시 확보! 먼 길 이동의 피로·시간 절약</span>
+              <span class="tag-con">단점: 35%의 중계 수수료 지불 필요</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="compare-insight-box">
+          <span class="insight-icon">💡</span>
+          <strong>역사적 통찰:</strong> 거리가 멀수록 직접 이동에 드는 시간과 생활비가 급증하기 때문에, 고대·중세 상인들은 중간에 있는 <em>중계무역상(말라카, 아라비아 상인 등)</em>을 적극 활용하여 효율적으로 세계 상품을 교역했습니다!
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="btn-close-compare">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 최종 게임 결과 및 학습지 복사 모달 -->
+  <div class="modal-overlay" id="modal-final-result" role="dialog" aria-modal="true">
+    <div class="modal-box final-modal-box">
+      <div class="final-header">
+        <span class="trophy-icon">🏆</span>
+        <h2>인도양 무역 시뮬레이션 최종 보고서</h2>
+        <p class="final-subtitle">3라운드에 걸친 20일간의 세계적 상품 교역 여정이 모두 끝났습니다!</p>
+      </div>
+      <div class="modal-body">
+        <!-- 칭호 및 성과 뱃지 -->
+        <div class="merchant-title-card" id="merchant-title-card">
+          <div class="merchant-badge-icon" id="merchant-badge-icon">🌟</div>
+          <div class="merchant-badge-info">
+            <div class="title-label">나의 무역 상인 칭호</div>
+            <h3 id="merchant-title-text">인도양의 현명한 글로벌 대상인</h3>
+            <p id="merchant-title-desc">직접 이동과 중계무역을 균형 있게 활용하여 세계의 진귀한 상품들을 성공적으로 교역했습니다.</p>
+          </div>
+        </div>
+
+        <!-- 최종 결산 재정 내역표 (구분 표시) -->
+        <div class="final-financial-grid">
+          <div class="fin-card">
+            <span class="fin-label">최종 보유 자금</span>
+            <strong class="fin-val gold-text" id="final-funds">0 냥</strong>
+            <small>(시작 자금: 500 냥)</small>
+          </div>
+          <div class="fin-card">
+            <span class="fin-label">최종 순이익</span>
+            <strong class="fin-val" id="final-net-profit">+0 냥</strong>
+            <small>총수익 - 총지출</small>
+          </div>
+          <div class="fin-card">
+            <span class="fin-label">총 상품 판매 수익 (🟢)</span>
+            <strong class="fin-val green-text" id="final-revenue">+0 냥</strong>
+          </div>
+          <div class="fin-card">
+            <span class="fin-label">총 지출 합계 (🔴)</span>
+            <strong class="fin-val red-text" id="final-expenses">-0 냥</strong>
+          </div>
+        </div>
+
+        <!-- 세부 지출 분리 내역 -->
+        <div class="breakdown-details-box">
+          <h4>📊 세부 지출 항목 분석</h4>
+          <div class="breakdown-columns">
+            <div class="breakdown-item">
+              <span>상품 구매비:</span>
+              <strong id="final-exp-goods">0 냥</strong>
+            </div>
+            <div class="breakdown-item">
+              <span>이동 운송비 (해상/육상):</span>
+              <strong id="final-exp-transport">0 냥</strong>
+            </div>
+            <div class="breakdown-item">
+              <span>일일 고정 운영비 (20일분):</span>
+              <strong id="final-exp-living">100 냥</strong>
+            </div>
+            <div class="breakdown-item">
+              <span>중계무역 수수료:</span>
+              <strong id="final-exp-commission">0 냥</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 교역 활동 및 방문 기록 -->
+        <div class="activity-summary-box">
+          <h4>🗺️ 무역 항해 통계</h4>
+          <div class="stats-pills-row">
+            <span class="stat-pill">방문한 거점: <strong id="final-visited-count">1곳</strong></span>
+            <span class="stat-pill">⛵ 해상 이동: <strong id="final-sea-trips">0회</strong></span>
+            <span class="stat-pill">🐪 육상 이동: <strong id="final-land-trips">0회</strong></span>
+            <span class="stat-pill">🤝 중계무역 이용: <strong id="final-middleman-orders">0회</strong></span>
+          </div>
+          <div class="visited-hubs-list" id="final-visited-hubs">
+            방문 지역: 인도
+          </div>
+        </div>
+
+        <!-- 역사 수업 연계 최종 정리 질문 -->
+        <div class="final-questions-box">
+          <h4>✏️ 역사 수업 최종 정리 질문 (학습지 작성용)</h4>
+          <div class="final-q-item">
+            <strong>Q1. 실제 역사 속 상인들은 먼 지역과 교역하는 과정에서 어떤 어려움을 겪었을까?</strong>
+            <p>(이동 소요 시간, 식량과 생활비, 거센 파도와 계절풍, 도적과 사막 등의 운송 위험)</p>
+          </div>
+          <div class="final-q-item">
+            <strong>Q2. 직접 이동과 중계무역은 지역 간 상품 교역에 어떤 영향을 주었을까?</strong>
+            <p>(직접 이동은 물류를 직접 확인하는 장점이 있으나 시간과 비용이 많이 들며, 중계무역은 중간 거점(말라카, 아라비아 등)을 번영시키고 장거리 상품의 원활한 유통을 가능하게 함)</p>
+          </div>
+        </div>
+
+        <div class="copy-success-alert" id="copy-success-alert" style="display: none;">
+          ✅ 학습지용 전체 결과 보고서가 클립보드에 복사되었습니다! NotebookLM이나 학습지에 [붙여넣기(Ctrl+V)] 하세요.
+        </div>
+      </div>
+      <div class="modal-footer space-between">
+        <button class="btn-secondary" id="btn-copy-worksheet">📋 학습지용 결과 텍스트 복사</button>
+        <button class="btn-confirm" id="btn-restart-game">🔄 처음부터 다시 하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 도움말 안내 모달 -->
+  <div class="modal-overlay" id="modal-help" role="dialog" aria-modal="true">
+    <div class="modal-box help-modal-box">
+      <div class="modal-header">
+        <h3>📖 인도양 무역 시뮬레이션 게임 가이드</h3>
+        <button class="btn-close-modal" id="btn-close-help-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h4>1. 게임의 목표</h4>
+        <p>단순히 돈을 많이 버는 것이 아니라, <strong>지역마다 다른 상품이 생산되고 교역되는 원리</strong>와 <strong>직접 이동 vs 중계무역의 차이점</strong>을 직접 체험하는 역사 시뮬레이션입니다.</p>
+
+        <h4>2. 라운드 구성 (총 20일)</h4>
+        <ul>
+          <li><strong>1라운드 (1~4일):</strong> 지역 내 교역 (상품 구매와 판매 원리 체험)</li>
+          <li><strong>2라운드 (5~12일):</strong> 직접 이동 교역 (해상 ⛵ 및 육상 🐪 이동과 운송비·생활비 체험)</li>
+          <li><strong>3라운드 (13~20일):</strong> 중계무역 (중계무역상 🤝을 통한 원격 무역과 수수료 체험)</li>
+        </ul>
+
+        <h4>3. 핵심 경제 규칙</h4>
+        <ul>
+          <li><strong>시간 시스템:</strong> 상품 구매 1일, 판매 1일, 중계무역 1일, 이동은 경로에 따라 2~4일이 소요됩니다.</li>
+          <li><strong>일일 고정 운영비:</strong> 매일 5냥의 생활비(숙박, 식비, 인건비)가 지출됩니다. (이동 중에도 동일하게 발생!)</li>
+          <li><strong>중계무역 수수료:</strong> 직접 가지 않고 물건을 들여오는 대가로 상품가의 35%가 부과됩니다.</li>
+          <li><strong>경제 수치:</strong> 게임 내 수치는 역사 학습을 위한 가상의 값입니다.</li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-confirm" id="btn-confirm-help">확인 완료</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
